@@ -1,17 +1,17 @@
 # 📦 Soroban Smart Contract: Distributor
 
-This Soroban contract distributes tokens from a sender to multiple recipients using `transfer_from`. The sender must explicitly authorize the call with `require_auth()` and must have previously approved the contract to use their tokens.
+This Soroban contract distributes tokens from a sender to multiple recipients efficiently. It uses `token.transfer` directly, meaning the sender authorizes the transaction via `require_auth()`, without needing a prior `approve` step.
 
 ---
 
 ## ✨ Function
 
-### `distribute(env, xlm_sac, sender, recipients)`
+### `distribute(env, token_address, sender, recipients)`
 
 Distributes tokens from `sender` to each `recipient` with the given amount.
 
-- `xlm_sac`: Contract address of the token (e.g., tokenized XLM).
-- `sender`: The address that must authorize the invocation and have approved token use.
+- `token_address`: Address of the token contract (e.g., Native XLM SAC, USDC, etc.).
+- `sender`: The address that must authorize the invocation.
 - `recipients`: A vector of `(recipient_address, amount)` tuples.
 
 ---
@@ -22,31 +22,35 @@ Distributes tokens from `sender` to each `recipient` with the given amount.
 |-----------------------------------------------------|---------------------------|---------------|----------------------------------------------------------|
 | `recipients` is not empty                           | ✅ Backend                | ❌ No         | Saves gas, avoids no-op calls.                           |
 | Each `recipient` is a valid Stellar address         | ✅ Backend                | ❌ No         | Soroban `Address` type enforces valid input.             |
-| Each `amount > 0`                                   | ✅ Backend + ✅ Contract  | ✅ **Yes**    | Prevents abuse, ensures safe logic.                      |
+| Each `amount > 0`                                   | ✅ Backend + ✅ Contract  | ✅ **Yes**    | Prevents abuse (Contract panics if <= 0).                |
 | Total `amount` ≤ sender’s balance                   | ✅ Backend                | ❌ No         | Improves UX, avoids failed transactions.                 |
-| `sender` has approved this contract via `approve()` | ✅ Backend                | ❌ No         | Required for `transfer_from` to succeed.                 |
-| `xlm_sac` points to a valid token contract          | ✅ Backend                | ❌ No         | Cannot be verified dynamically from contract.            |
+| `token_address` points to a valid token contract    | ✅ Backend                | ❌ No         | Cannot be verified dynamically from contract.            |
 | `require_auth(sender)`                              | ✅ Contract               | ✅ **Yes**    | Ensures the sender has signed the call (authentication). |
 
 ---
 
-## ⚙️ Security Notes
+## ⚙️ Security & Efficiency Notes
 
-- The contract is stateless.
-- It enforces sender authentication via `require_auth()`.
-- Uses `transfer_from(sender, sender, recipient, amount)` — this requires token `approve` to be called beforehand.
-- Emits events for each transfer.
+- **Stateless**: The contract does not store data.
+- **Authentication**: Enforces sender authentication via `require_auth()`.
+- **Direct Transfer**: Uses `token.transfer(sender, recipient, amount)` instead of `transfer_from`. This is more gas-efficient and removes the need for allowances.
+- **Batch Event**: Emits a single `distribute_batch` event at the end of the transaction with the total amount distributed, saving significant gas compared to per-transfer events.
+- **Atomic**: If any transfer fails (e.g., insufficient balance), the entire transaction reverts.
 
 ---
 
 ## 🚀 Build Instructions
 
 1. Ensure you have Rust and Soroban CLI installed.
-2. Compile the contract:
+2. Add the wasm target:
+   ```bash
+   rustup target add wasm32-unknown-unknown
+   ```
+3. Compile the contract:
 
-```bash
-cargo build --target wasm32-unknown-unknown --release
-```
+   ```bash
+   cargo build --target wasm32-unknown-unknown --release
+   ```
 
 The output will be in:
 
@@ -59,10 +63,10 @@ target/wasm32-unknown-unknown/release/distributor.wasm
 ## 📜 Example Call
 
 ```js
-// From backend using Soroban JS SDK
+// From backend using Soroban JS SDK (generating the XDR)
 contract.distribute({
   env,
-  xlm_sac: tokenAddress,
+  token_address: tokenAddress, // Can be any Soroban-compatible token
   sender: userAddress,
   recipients: [
     [recipient1, amount1],
@@ -71,9 +75,7 @@ contract.distribute({
 });
 ```
 
-Make sure `userAddress`:
-- Calls `approve(xlm_sac, contract_address, total_amount)` beforehand
-- Signs the transaction to meet `require_auth()` check
+**Note**: The `userAddress` must sign the transaction. No prior `approve` call is needed.
 
 ---
 
