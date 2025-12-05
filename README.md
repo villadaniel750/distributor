@@ -79,6 +79,12 @@ contract.distribute({
 
 ---
 
+## 🌐 Mainnet Deployment
+
+**Contract ID**: `CC4CR7EV6IR3EPLHWQSFWPZP7WV7XZOQAXT25UX64JVH7DUUQA2UVSBJ`
+
+---
+
 ## 🔐 License
 
 MIT – use it freely and responsibly.

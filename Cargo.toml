@@ -13,3 +13,9 @@ soroban-env-macros = "22.0.7"
 
 [dev-dependencies]
 soroban-sdk-macros = "22.0.7"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"

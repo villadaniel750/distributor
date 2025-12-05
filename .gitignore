@@ -1,1 +1,5 @@
 /target
+
+# Local checks and system files
+check_contract/
+.DS_Store
